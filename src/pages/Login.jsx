@@ -9,35 +9,92 @@ const Login = () => {
     const [password, setPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
     const [rememberMe, setRememberMe] = useState(false);
+    const [isLoading, setIsLoading] = useState(false);
+    const [errorMsg, setErrorMsg] = useState('');
 
-    const handleSubmit = (e) => {
+    const handleSubmit = async (e) => {
         e.preventDefault();
+        setErrorMsg('');
+        setIsLoading(true);
 
-        if (email === 'family@admin.com' && password === '123456') {
-            localStorage.setItem('user', JSON.stringify({ email, role: 'family' }));
-            navigate('/dashboard');
-        } else if (email === 'owner@admin.com' && password === '123456') {
-            localStorage.setItem('user', JSON.stringify({ email, role: 'owner' }));
-            navigate('/owner/dashboard');
-        } else if (email === 'council@admin.com' && password === '123456') {
-            localStorage.setItem('user', JSON.stringify({ email, role: 'council' }));
-            navigate('/council/dashboard');
-        } else if (email === 'branch@admin.com' && password === '123456') {
-            localStorage.setItem('user', JSON.stringify({ email, role: 'branch' }));
-            navigate('/branch/dashboard');
-        } else if (email === 'business@admin.com' && password === '123456') {
-            localStorage.setItem('user', JSON.stringify({ email, role: 'business' }));
-            navigate('/business/dashboard');
-        } else if (email === 'devops@admin.com' && password === '123456') {
-            localStorage.setItem('user', JSON.stringify({ email, role: 'devops' }));
-            navigate('/devops/dashboard');
-        } else if (email === 'auditor@admin.com' && password === '123456') {
-            localStorage.setItem('user', JSON.stringify({ email, role: 'auditor' }));
-            navigate('/auditor/dashboard');
-        } else {
-            alert('Invalid credentials');
+        const cleanEmail = email.trim();
+        const cleanPassword = password;
+
+        try {
+            const apiBase = (import.meta.env.VITE_API_BASE_URL || 'https://uat-api.kincore.com/api').replace(/\/$/, '');
+            const res = await fetch(`${apiBase}/auth/kcc/login`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                },
+                body: JSON.stringify({
+                    identifier: cleanEmail,
+                    password: cleanPassword
+                })
+            });
+
+            const data = await res.json().catch(() => ({}));
+
+            if (res.ok && data.token) {
+                const userRole = data.user?.role === 'member' || !data.user?.role ? 'family' : data.user.role;
+                const sessionUser = {
+                    ...data.user,
+                    email: data.user?.email || cleanEmail,
+                    role: userRole,
+                    token: data.token
+                };
+                localStorage.setItem('user', JSON.stringify(sessionUser));
+                localStorage.setItem('token', data.token);
+
+                if (userRole === 'owner') navigate('/owner/dashboard');
+                else if (userRole === 'council') navigate('/council/dashboard');
+                else if (userRole === 'branch') navigate('/branch/dashboard');
+                else if (userRole === 'business') navigate('/business/dashboard');
+                else if (userRole === 'devops') navigate('/devops/dashboard');
+                else if (userRole === 'auditor') navigate('/auditor/dashboard');
+                else navigate('/dashboard');
+                return;
+            }
+
+            // Fallback for local mock accounts
+            if (cleanEmail === 'family@admin.com' && cleanPassword === '123456') {
+                localStorage.setItem('user', JSON.stringify({ email: cleanEmail, role: 'family' }));
+                navigate('/dashboard');
+            } else if (cleanEmail === 'owner@admin.com' && cleanPassword === '123456') {
+                localStorage.setItem('user', JSON.stringify({ email: cleanEmail, role: 'owner' }));
+                navigate('/owner/dashboard');
+            } else if (cleanEmail === 'council@admin.com' && cleanPassword === '123456') {
+                localStorage.setItem('user', JSON.stringify({ email: cleanEmail, role: 'council' }));
+                navigate('/council/dashboard');
+            } else if (cleanEmail === 'branch@admin.com' && cleanPassword === '123456') {
+                localStorage.setItem('user', JSON.stringify({ email: cleanEmail, role: 'branch' }));
+                navigate('/branch/dashboard');
+            } else if (cleanEmail === 'business@admin.com' && cleanPassword === '123456') {
+                localStorage.setItem('user', JSON.stringify({ email: cleanEmail, role: 'business' }));
+                navigate('/business/dashboard');
+            } else if (cleanEmail === 'devops@admin.com' && cleanPassword === '123456') {
+                localStorage.setItem('user', JSON.stringify({ email: cleanEmail, role: 'devops' }));
+                navigate('/devops/dashboard');
+            } else if (cleanEmail === 'auditor@admin.com' && cleanPassword === '123456') {
+                localStorage.setItem('user', JSON.stringify({ email: cleanEmail, role: 'auditor' }));
+                navigate('/auditor/dashboard');
+            } else {
+                setErrorMsg(data.error || 'Invalid credentials');
+            }
+        } catch (err) {
+            if (cleanEmail === 'family@admin.com' && cleanPassword === '123456') {
+                localStorage.setItem('user', JSON.stringify({ email: cleanEmail, role: 'family' }));
+                navigate('/dashboard');
+            } else if (cleanEmail === 'owner@admin.com' && cleanPassword === '123456') {
+                localStorage.setItem('user', JSON.stringify({ email: cleanEmail, role: 'owner' }));
+                navigate('/owner/dashboard');
+            } else {
+                setErrorMsg(err.message || 'Login network error');
+            }
+        } finally {
+            setIsLoading(false);
         }
-
     };
 
     return (
@@ -129,12 +186,19 @@ const Login = () => {
                             </div>
                         </div>
 
+                        {errorMsg && (
+                            <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl text-red-600 dark:text-red-400 text-sm font-medium text-center">
+                                {errorMsg}
+                            </div>
+                        )}
+
                         {/* Button */}
                         <button
                             type="submit"
-                            className="w-full flex justify-center py-4 px-4 border border-transparent rounded-full shadow-md text-sm font-bold text-white bg-[#FF6D4D] hover:bg-[#FF5D3D] transition-all transform hover:scale-[1.01] active:scale-[0.99] mt-4"
+                            disabled={isLoading}
+                            className="w-full flex justify-center py-4 px-4 border border-transparent rounded-full shadow-md text-sm font-bold text-white bg-[#FF6D4D] hover:bg-[#FF5D3D] disabled:opacity-60 transition-all transform hover:scale-[1.01] active:scale-[0.99] mt-4"
                         >
-                            Get Started
+                            {isLoading ? 'Signing in...' : 'Get Started'}
                         </button>
                     </form>
                 </div>
